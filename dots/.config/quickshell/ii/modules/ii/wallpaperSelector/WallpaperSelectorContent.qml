@@ -9,6 +9,7 @@ import QtQuick.Layouts
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 
 MouseArea {
     id: root
@@ -16,16 +17,49 @@ MouseArea {
     property real previewCellAspectRatio: 4 / 3
     property bool useDarkMode: Appearance.m3colors.darkmode
 
+    readonly property var qsWindow: QsWindow.window
+    // Prefer Hyprland's monitor scale: the layer surface's own devicePixelRatio
+    // is briefly the integer scale (e.g. 2) before it settles to the fractional
+    // scale (e.g. 1.6), which would make the delegates request a different
+    // bucket than the one we generate.
+    readonly property real devicePixelRatio: {
+        const monitorScale = Hyprland.focusedMonitor?.scale;
+        if (monitorScale && monitorScale > 0) return monitorScale;
+        return root.qsWindow ? root.qsWindow.devicePixelRatio : 1;
+    }
+    readonly property real totalImageMargin: (Appearance.sizes.wallpaperSelectorItemMargins + Appearance.sizes.wallpaperSelectorItemPadding) * 2
+    // The delegates' ThumbnailImage sizes itself from sourceSize, which is the
+    // item size multiplied by the window's devicePixelRatio. Use the same
+    // formula here so the generated cache and the requested size always match.
+    readonly property string thumbnailSizeName: Images.thumbnailSizeNameForDimensions(
+        (grid.cellWidth - root.totalImageMargin) * root.devicePixelRatio,
+        (grid.cellHeight - root.totalImageMargin) * root.devicePixelRatio
+    )
+
     function updateThumbnails() {
-        const totalImageMargin = (Appearance.sizes.wallpaperSelectorItemMargins + Appearance.sizes.wallpaperSelectorItemPadding) * 2;
-        const thumbnailSizeName = Images.thumbnailSizeNameForDimensions(grid.cellWidth - totalImageMargin, grid.cellHeight - totalImageMargin);
+        if (!root.qsWindow || grid.cellWidth <= 0) return;
         Wallpapers.generateThumbnail(thumbnailSizeName);
+    }
+
+    // The window's devicePixelRatio is briefly the integer scale before it
+    // settles to the fractional scale, and the grid is laid out asynchronously.
+    // Debounce so thumbnails are generated once the size name has stabilised.
+    function scheduleThumbnailUpdate() {
+        thumbnailUpdateTimer.restart();
+    }
+    onQsWindowChanged: root.scheduleThumbnailUpdate()
+    onThumbnailSizeNameChanged: root.scheduleThumbnailUpdate()
+
+    Timer {
+        id: thumbnailUpdateTimer
+        interval: 250
+        onTriggered: root.updateThumbnails()
     }
 
     Connections {
         target: Wallpapers
         function onDirectoryChanged() {
-            root.updateThumbnails();
+            root.scheduleThumbnailUpdate();
         }
     }
 
@@ -300,7 +334,7 @@ MouseArea {
                         ScrollBar.vertical: StyledScrollBar {}
 
                         Component.onCompleted: {
-                            root.updateThumbnails();
+                            root.scheduleThumbnailUpdate();
                         }
 
                         function moveSelection(delta) {
@@ -318,6 +352,7 @@ MouseArea {
                         delegate: WallpaperDirectoryItem {
                             required property var modelData
                             required property int index
+                            thumbnailSizeName: root.thumbnailSizeName
                             fileModelData: modelData
                             width: grid.cellWidth
                             height: grid.cellHeight
