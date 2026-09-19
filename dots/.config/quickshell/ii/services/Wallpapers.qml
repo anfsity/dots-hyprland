@@ -137,11 +137,17 @@ Singleton {
         if (!["normal", "large", "x-large", "xx-large"].includes(size)) throw new Error("Invalid thumbnail size");
         thumbgenProc.directory = root.directory
         thumbgenProc.running = false
+
+        const rawPath = decodeURIComponent(FileUtils.trimFileProtocol(root.directory.toString()))
+
         thumbgenProc.command = [
             "bash", "-c",
-            `${thumbgenScriptPath} --size ${size} --machine_progress -d ${FileUtils.trimFileProtocol(root.directory)} || ${generateThumbnailsMagickScriptPath} --size ${size} -d ${FileUtils.trimFileProtocol(root.directory)}`,
+            `"${generateThumbnailsMagickScriptPath}" --size "$1" -d "$2"`,
+            "wallpaper-thumbgen",
+            size,
+            rawPath,
         ]
-        // console.log("[Wallpapers] Updating thumbnails with command ", thumbgenProc.command.join(" "))
+        
         root.thumbnailGenerationProgress = 0
         thumbgenProc.running = true
     }
