@@ -54,6 +54,8 @@ Scope {
                 if (GlobalStates.screenLocked) {
                     lockContext.reset();
                     lockContext.tryFingerUnlock();
+                } else {
+                    lockContext.sessionLocked = false;
                 }
             }
         }
@@ -90,6 +92,8 @@ Scope {
         id: lock
         locked: GlobalStates.screenLocked
         surface: root.sessionLockSurface
+        // Wait until the compositor confirms the lock before starting biometrics.
+        onSecureChanged: lockContext.sessionLocked = lock.secure && GlobalStates.screenLocked
     }
 
     function lock() {

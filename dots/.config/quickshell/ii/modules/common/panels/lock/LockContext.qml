@@ -20,8 +20,26 @@ Scope {
     property bool unlockInProgress: false
     property bool showFailure: false
     property bool fingerprintsConfigured: false
+    property bool sessionLocked: false
+    property bool gazeAvailable: false
+    property bool faceAuthInProgress: false
+    readonly property bool faceUnlockEnabled: gazeAvailable && (Config.options.lock.faceUnlock?.enable ?? true)
     property var targetAction: LockContext.ActionEnum.Unlock
     property bool alsoInhibitIdle: false
+
+    onSessionLockedChanged: {
+        if (sessionLocked) tryFaceUnlock();
+        else stopFacePam();
+    }
+    onFaceUnlockEnabledChanged: {
+        if (faceUnlockEnabled) tryFaceUnlock();
+        else stopFacePam();
+    }
+    onTargetActionChanged: {
+        stopFacePam();
+        tryFaceUnlock();
+    }
+    onShouldReFocus: tryFaceUnlock()
 
     function resetTargetAction() {
         root.targetAction = LockContext.ActionEnum.Unlock;
@@ -40,6 +58,8 @@ Scope {
         root.clearText();
         root.unlockInProgress = false;
         stopFingerPam();
+        stopFacePam();
+        tryFaceUnlock();
     }
 
     Timer {
@@ -60,6 +80,8 @@ Scope {
     }
 
     function tryUnlock(alsoInhibitIdle = false) {
+        if (root.unlockInProgress) return;
+        stopFacePam();
         root.alsoInhibitIdle = alsoInhibitIdle;
         root.unlockInProgress = true;
         pam.start();
@@ -74,6 +96,63 @@ Scope {
     function stopFingerPam() {
         if (fingerPam.active) {
             fingerPam.abort();
+        }
+    }
+
+    function tryFaceUnlock(delay = Config.options.lock.faceUnlock?.startDelayMs ?? 2000) {
+        if (!root.sessionLocked || !root.faceUnlockEnabled || root.unlockInProgress
+                || root.targetAction !== LockContext.ActionEnum.Unlock
+                || facePam.active || faceStartTimer.running) return;
+        faceStartTimer.interval = Math.max(0, delay);
+        faceStartTimer.start();
+    }
+
+    function stopFacePam() {
+        faceStartTimer.stop();
+        root.faceAuthInProgress = false;
+        if (facePam.active) facePam.abort();
+    }
+
+    Timer {
+        id: faceStartTimer
+        onTriggered: {
+            if (root.sessionLocked && root.faceUnlockEnabled && !root.unlockInProgress
+                    && root.targetAction === LockContext.ActionEnum.Unlock) {
+                root.faceAuthInProgress = facePam.start();
+            }
+        }
+    }
+
+    Process {
+        id: gazeCheckProc
+        running: true
+        command: ["sh", "-c", "command -v gaze >/dev/null 2>&1"]
+        onExited: (exitCode, exitStatus) => root.gazeAvailable = exitCode === 0
+    }
+
+    PamContext {
+        id: facePam
+        configDirectory: "pam"
+        config: "quickshell-face"
+
+        // Confirmation prompts need UI support; fall back to the password instead
+        // of answering them automatically or forwarding the user's password.
+        onPamMessage: {
+            if (this.responseRequired) root.stopFacePam();
+        }
+
+        onCompleted: result => {
+            const wasRunning = root.faceAuthInProgress;
+            root.faceAuthInProgress = false;
+            if (!wasRunning || !root.sessionLocked || !root.faceUnlockEnabled
+                    || root.unlockInProgress || root.targetAction !== LockContext.ActionEnum.Unlock) return;
+            if (result === PamResult.Success) {
+                root.stopFingerPam();
+                root.unlocked(LockContext.ActionEnum.Unlock);
+            } else if (result === PamResult.Failed) {
+                // A scan can time out long before the user returns to the computer.
+                root.tryFaceUnlock(Config.options.lock.faceUnlock?.retryDelayMs ?? 10000);
+            }
         }
     }
 
@@ -115,6 +194,7 @@ Scope {
                 root.unlockInProgress = false;
                 GlobalStates.screenUnlockFailed = true;
                 root.showFailure = true;
+                root.tryFaceUnlock();
             }
         }
     }

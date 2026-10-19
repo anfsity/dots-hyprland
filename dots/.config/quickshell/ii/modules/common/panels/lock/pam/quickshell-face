@@ -1,0 +1,6 @@
+# Face-only authentication; passwords use their own PamContext.
+# Never treat PAM_IGNORE (no enrollment / unavailable daemon) as a match.
+auth requisite pam_nologin.so
+auth requisite pam_faillock.so preauth
+auth [success=ok default=die] pam_gaze.so
+auth required pam_faillock.so authsucc

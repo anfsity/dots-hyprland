@@ -374,6 +374,12 @@ Singleton {
             property JsonObject lock: JsonObject {
                 property bool useHyprlock: false
                 property bool launchOnStartup: false
+                property JsonObject faceUnlock: JsonObject {
+                    // Optional Gaze integration; the CLI must be installed.
+                    property bool enable: true
+                    property int startDelayMs: 2000
+                    property int retryDelayMs: 10000
+                }
                 property JsonObject blur: JsonObject {
                     property bool enable: true
                     property real radius: 100
