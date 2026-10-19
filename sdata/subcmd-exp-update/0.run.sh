@@ -824,20 +824,7 @@ load_ignore_patterns
 log_header "Pulling Latest Changes"
 
 current_branch=$(git branch --show-current)
-if [[ -z "$current_branch" ]]; then
-  log_warning "In detached HEAD state. Checking out main/master branch..."
-  if git show-ref --verify --quiet refs/heads/main; then
-    git checkout main
-    current_branch="main"
-  elif git show-ref --verify --quiet refs/heads/master; then
-    git checkout master
-    current_branch="master"
-  else
-    log_die "Could not find main or master branch"
-  fi
-fi
-
-log_info "Current branch: $current_branch"
+log_info "Current branch: ${current_branch:-detached HEAD}"
 
 if ! git diff --quiet || ! git diff --cached --quiet; then
   log_warning "You have uncommitted changes:"
@@ -861,32 +848,13 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   fi
 fi
 
-if git remote get-url origin &>/dev/null; then
-  log_info "Pulling changes from origin/$current_branch..."
-  if [[ "$DRY_RUN" == true ]]; then
-    log_info "[DRY-RUN] Would run: git pull --ff-only"
-  else
-    if git pull --ff-only; then
-      log_success "Successfully pulled latest changes"
-      git submodule update --init --recursive
-      # Verify we actually got new commits
-      if git rev-parse --verify HEAD@{1} &>/dev/null; then
-        if [[ "$(git rev-parse HEAD)" == "$(git rev-parse HEAD@{1})" ]]; then
-          log_info "Already up to date with remote"
-        fi
-      fi
-    else
-      log_warning "Failed to pull changes from remote."
-      log_warning "This could be due to:"
-      log_warning "  - Network issues"
-      log_warning "  - Uncommitted local changes (use 'git stash' first)"
-      log_warning "  - Diverged history (may need 'git pull --rebase')"
-      log_info "Continuing with local repository state..."
-    fi
-  fi
-else
-  log_warning "No remote 'origin' configured. Skipping pull operation."
-  log_info "This appears to be a local-only repository."
+if ! setup_update_repository "$DRY_RUN"; then
+  log_die "Could not update $SETUP_REPO_URL ($SETUP_REPO_BRANCH). Resolve the Git error before syncing files."
+fi
+if [[ "$DRY_RUN" != true ]]; then
+  current_branch=$(git branch --show-current)
+  git submodule update --init --recursive
+  log_success "Updated from the maintained repository"
 fi
 
 # Step 2: Handle package building

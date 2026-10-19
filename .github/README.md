@@ -44,9 +44,17 @@
   <summary>Installation</summary>
 
    - **IMPORTANT: Hyprland 0.55 Update**: If your distro has not shipped Hyprland 0.55 and/or you're not ready for it, you should switch to the Pre-Hyprland Luaification release. See [the wiki](https://ii.clsty.link/en/ii-qs/01setup/) for more info
-   - Just run `bash <(curl -s https://ii.clsty.link/get)`
-     - Or, clone this repo and run `./setup install`
-     - See [the wiki](https://ii.clsty.link/en/ii-qs/01setup/) for more details
+   - Install the maintained `my-config` branch:
+     ```sh
+     git clone --branch my-config https://github.com/anfsity/dots-hyprland.git
+     cd dots-hyprland
+     ./setup install
+     ```
+     - Future file updates: `./setup exp-update`. It fetches this fork's `my-config` branch explicitly and only fast-forwards; existing local commits are preserved.
+     - For a full reinstall/update, first run `git switch my-config` and `git pull --ff-only https://github.com/anfsity/dots-hyprland.git my-config`, then `./setup install`.
+     - `setup install` installs the current checkout and checks that it is on `my-config`. It does not download or publish commits.
+     - `upstream` and the explicit `exp-merge` command remain available for intentionally integrating end-4's changes; normal updates use this fork.
+     - See [the upstream wiki](https://ii.clsty.link/en/ii-qs/01setup/) for dependency and platform details.
    - **Keybinds**: Should be somewhat familiar to Windows or GNOME users. Important ones:
      - `Super`+`/` = keybind list
      - `Super`+`Enter` = terminal

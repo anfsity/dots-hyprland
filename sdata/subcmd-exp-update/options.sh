@@ -22,7 +22,7 @@ Options:
 
 This script updates your dotfiles by:
   1. Auto-detecting repository structure (dots/ prefix or direct)
-  2. Pulling latest changes from git remote
+  2. Fast-forwarding ${SETUP_REPO_URL} (${SETUP_REPO_BRANCH})
   3. Optionally rebuilding packages (if -p flag is used)
   4. Syncing configuration files to home directory
   5. Updating script permissions

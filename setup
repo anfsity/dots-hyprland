@@ -4,6 +4,7 @@ cd "$(dirname "$0")"
 REPO_ROOT="$(pwd)"
 source ./sdata/lib/environment-variables.sh
 source ./sdata/lib/functions.sh
+source ./sdata/lib/repository.sh
 source ./sdata/lib/package-installers.sh
 source ./sdata/lib/dist-determine.sh
 
@@ -24,7 +25,8 @@ Syntax:
 
 Subcommands:
   install        (Re)Install/Update illogical-impulse.
-                 Note: To update to the latest, manually run \"git stash && git pull\" first.
+                 Source: ${SETUP_REPO_URL} (${SETUP_REPO_BRANCH}).
+                 Update this branch first, then run install.
   install-deps   Run the install step \"1. Install dependencies\"
   install-setups Run the install step \"2. Setup for permissions/services etc\"
   install-files  Run the install step \"3. Copying config files\"
@@ -65,6 +67,12 @@ esac
 if [[ -f "${SUBCMD_DIR}/options.sh" ]];
   then source "${SUBCMD_DIR}/options.sh"
 fi
+# Help/options have already been handled; check before installation side effects.
+case ${SUBCMD_NAME} in
+  install|install-deps|install-setups|install-files)
+    setup_require_branch || exit 1
+    ;;
+esac
 case ${SUBCMD_NAME} in
   install)
     for function in ${print_os_group_id_functions[@]}; do
