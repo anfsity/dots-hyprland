@@ -809,7 +809,19 @@ ContentPage {
         icon: "wallpaper_slideshow"
         title: Translation.tr("Wallpaper selector")
 
+        ConfigSelectionArray {
+            currentValue: Config.options.wallpaperSelector.backend
+            onSelected: newValue => {
+                Config.options.wallpaperSelector.backend = newValue;
+            }
+            options: [
+                { displayName: Translation.tr("Built-in selector"), icon: "wallpaper", value: "builtin" },
+                { displayName: "Skwd Wall", icon: "photo_library", value: "skwd" }
+            ]
+        }
+
         ConfigSwitch {
+            visible: Config.options.wallpaperSelector.backend === "builtin"
             buttonIcon: "ad"
             text: Translation.tr('Use system file picker')
             checked: Config.options.wallpaperSelector.useSystemFileDialog

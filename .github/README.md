@@ -62,6 +62,22 @@
 
 </details>
 
+## Optional Skwd Wall picker
+
+In **Settings → Interface → Wallpaper selector**, choose **Built-in selector** or **Skwd Wall**.
+`Ctrl + Super + T` opens the selected picker. The built-in picker remains the default and is also
+used if Skwd cannot start. The system file-picker option applies to the built-in picker.
+
+Install the optional `skwd-wall-v2-bin` AUR package and its `skwd-deck-bin` / `skwd-paper-bin`
+dependencies. The portable binaries from the existing `~/.local/share/skwd-trial` trial are also supported.
+The integration starts its daemon on demand as a transient user service; it does not enable login startup.
+
+Image and video selections use the existing end-4 wallpaper and colour scripts. Wallpaper Engine
+rendering is not enabled by this integration. Skwd's preferences are stored separately in
+`~/.config/illogical-impulse/skwd-wall/config.json`; an existing trial's preferences are imported once.
+New configurations start with the English grid view. Switching back to the built-in picker stops
+the integration's Skwd process and temporary daemon.
+
 <details>
   <summary>Software overview</summary>
 

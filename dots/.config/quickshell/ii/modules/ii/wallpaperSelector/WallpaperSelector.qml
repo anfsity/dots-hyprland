@@ -12,6 +12,14 @@ import Quickshell.Hyprland
 
 Scope {
     id: root
+    readonly property string skwdScript: FileUtils.trimFileProtocol(`${Directories.scriptPath}/wallpaper/skwd-picker.sh`)
+    readonly property string pickerBackend: Config.options.wallpaperSelector.backend
+
+    onPickerBackendChanged: {
+        GlobalStates.wallpaperSelectorOpen = false;
+        if (root.pickerBackend === "builtin")
+            Quickshell.execDetached(["bash", root.skwdScript, "--close"]);
+    }
 
     Loader {
         id: wallpaperSelectorLoader
@@ -62,12 +70,30 @@ Scope {
         }
     }
 
-    function toggleWallpaperSelector() {
+    function toggleBuiltinPicker() {
         if (Config.options.wallpaperSelector.useSystemFileDialog) {
             Wallpapers.openFallbackPicker(Appearance.m3colors.darkmode);
             return;
         }
         GlobalStates.wallpaperSelectorOpen = !GlobalStates.wallpaperSelectorOpen
+    }
+
+    function toggleWallpaperSelector() {
+        if (root.pickerBackend === "skwd") {
+            GlobalStates.wallpaperSelectorOpen = false;
+            if (!skwdPickerProc.running)
+                skwdPickerProc.exec(["bash", root.skwdScript, "--toggle"]);
+            return;
+        }
+        root.toggleBuiltinPicker();
+    }
+
+    Process {
+        id: skwdPickerProc
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 && root.pickerBackend === "skwd")
+                root.toggleBuiltinPicker();
+        }
     }
 
     IpcHandler {

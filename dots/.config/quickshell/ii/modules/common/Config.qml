@@ -590,6 +590,7 @@ Singleton {
             }
             
             property JsonObject wallpaperSelector: JsonObject {
+                property string backend: "builtin"
                 property bool useSystemFileDialog: false
             }
             
