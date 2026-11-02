@@ -721,5 +721,11 @@
   "Move left": "左移",
   "Pin to Start": "固定到“开始”屏幕",
   "Pin": "固定",
-  "Unpin": "取消固定"
+  "Unpin": "取消固定",
+  "Long screenshot": "长截图",
+  "Scroll down manually; Super+Shift+S to finish": "手动向下滚动，Super+Shift+S 完成",
+  "%1 frames · %2 px": "%1 帧 · %2 像素",
+  "Screenshot": "普通截图",
+  "Finish": "完成",
+  "Return to the last captured view, then scroll down slowly": "请回到上次采集的位置，再缓慢向下滚动"
 }

@@ -29,13 +29,14 @@ PanelWindow {
 
     // Modes
     // TODO: Ask: sidebar AI
-    enum SnipAction { Copy, Edit, Search, CharRecognition, Record, RecordWithSound } 
+    enum SnipAction { Copy, Edit, Search, CharRecognition, Record, RecordWithSound, LongShot }
     enum SelectionMode { RectCorners, Circle }
     enum Phase { Select, Post }
     property var action: RegionSelection.SnipAction.Copy
     property var selectionMode: RegionSelection.SelectionMode.RectCorners
     property var phase: RegionSelection.Phase.Select
     signal dismiss()
+    signal longshotRequested(region: string, targetScreen: var, bounds: var)
 
     // Styles
     property string screenshotDir: Directories.screenshotTemp
@@ -263,6 +264,19 @@ PanelWindow {
         if (root.regionWidth <= 0 || root.regionHeight <= 0) {
             console.warn("[Region Selector] Invalid region size, skipping snip.");
             root.dismiss();
+            return;
+        }
+
+        // The persistent selector scope owns the manual capture session.
+        if (root.action === RegionSelection.SnipAction.LongShot) {
+            const lx = Math.max(0, Math.min(root.regionX, root.screen.width - root.regionWidth));
+            const ly = Math.max(0, Math.min(root.regionY, root.screen.height - root.regionHeight));
+            const lw = Math.max(1, Math.min(root.regionWidth, root.screen.width - lx));
+            const lh = Math.max(1, Math.min(root.regionHeight, root.screen.height - ly));
+            const regionArg = `${Math.round(root.monitorOffsetX + lx)},${Math.round(root.monitorOffsetY + ly)} ${Math.round(lw)}x${Math.round(lh)}`;
+            root.longshotRequested(regionArg, root.screen, {x: lx, y: ly, width: lw, height: lh});
+            root.dismiss();
+            return;
         }
 
         // Clamp region to screen bounds

@@ -24,7 +24,24 @@ Toolbar {
     signal dismiss()
 
     ToolbarTabBar {
+        visible: root.action === RegionSelection.SnipAction.Copy
+            || root.action === RegionSelection.SnipAction.Edit
+            || root.action === RegionSelection.SnipAction.LongShot
+        tabButtonList: [
+            {"icon": "content_cut", "name": Translation.tr("Screenshot")},
+            {"icon": "screenshot_monitor", "name": Translation.tr("Long screenshot")}
+        ]
+        currentIndex: root.action === RegionSelection.SnipAction.LongShot ? 1 : 0
+        onCurrentIndexChanged: {
+            if (!visible) return;
+            root.action = currentIndex === 1 ? RegionSelection.SnipAction.LongShot : RegionSelection.SnipAction.Copy;
+            if (currentIndex === 1) root.selectionMode = RegionSelection.SelectionMode.RectCorners;
+        }
+    }
+
+    ToolbarTabBar {
         id: tabBar
+        visible: root.action !== RegionSelection.SnipAction.LongShot
         tabButtonList: [
             {"icon": "activity_zone", "name": Translation.tr("Rect")},
             {"icon": "gesture", "name": Translation.tr("Circle")}

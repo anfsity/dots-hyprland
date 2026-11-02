@@ -26,6 +26,7 @@ Scope {
             sourceComponent: RegionSelection {
                 screen: regionSelectorLoader.modelData
                 onDismiss: root.dismiss()
+                onLongshotRequested: (region, targetScreen, bounds) => longshotSession.start(region, targetScreen, bounds)
                 action: root.action
                 selectionMode: root.selectionMode
             }
@@ -33,12 +34,17 @@ Scope {
     }
 
     function screenshot() {
+        if (longshotSession.active) {
+            longshotSession.finish();
+            return;
+        }
         root.action = RegionSelection.SnipAction.Copy
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
         GlobalStates.regionSelectorOpen = true
     }
 
     function search() {
+        longshotSession.cancel()
         root.action = RegionSelection.SnipAction.Search
         if (Config.options.search.imageSearch.useCircleSelection) {
             root.selectionMode = RegionSelection.SelectionMode.Circle
@@ -49,12 +55,14 @@ Scope {
     }
 
     function ocr() {
+        longshotSession.cancel()
         root.action = RegionSelection.SnipAction.CharRecognition
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
         GlobalStates.regionSelectorOpen = true
     }
 
     function record() {
+        longshotSession.cancel()
         root.action = RegionSelection.SnipAction.Record
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
         // If already open then re-trigger to stop recording
@@ -63,11 +71,26 @@ Scope {
     }
 
     function recordWithSound() {
+        longshotSession.cancel()
         root.action = RegionSelection.SnipAction.RecordWithSound
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
         // If already open then re-trigger to stop recording
         if (GlobalStates.regionSelectorOpen) GlobalStates.regionSelectorOpen = false
         GlobalStates.regionSelectorOpen = true
+    }
+
+    function longshot() {
+        if (longshotSession.active) {
+            longshotSession.finish();
+            return;
+        }
+        root.action = RegionSelection.SnipAction.LongShot
+        root.selectionMode = RegionSelection.SelectionMode.RectCorners
+        GlobalStates.regionSelectorOpen = true
+    }
+
+    LongShotSession {
+        id: longshotSession
     }
 
     IpcHandler {
@@ -88,12 +111,26 @@ Scope {
         function recordWithSound() {
             root.recordWithSound()
         }
+        function longshot() {
+            root.longshot()
+        }
+        function finishLongshot() {
+            longshotSession.finish()
+        }
+        function cancelLongshot() {
+            longshotSession.cancel()
+        }
     }
 
     GlobalShortcut {
         name: "regionScreenshot"
         description: "Takes a screenshot of the selected region"
         onPressed: root.screenshot()
+    }
+    GlobalShortcut {
+        name: "regionLongShot"
+        description: "Takes a long screenshot of the selected region"
+        onPressed: root.longshot()
     }
     GlobalShortcut {
         name: "regionSearch"

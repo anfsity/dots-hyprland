@@ -19,6 +19,8 @@ Item {
     case RegionSelection.SnipAction.Record:
     case RegionSelection.SnipAction.RecordWithSound:
         return Translation.tr("Record region");
+    case RegionSelection.SnipAction.LongShot:
+        return Translation.tr("Scroll down manually; Super+Shift+S to finish");
     }
     property string materialSymbol: switch (root.action) {
     case RegionSelection.SnipAction.Copy:
@@ -31,6 +33,8 @@ Item {
     case RegionSelection.SnipAction.Record:
     case RegionSelection.SnipAction.RecordWithSound:
         return "videocam";
+    case RegionSelection.SnipAction.LongShot:
+        return "screenshot_monitor";
     default:
         return "";
     }
@@ -44,7 +48,7 @@ Item {
         interval: 1000
         running: true
         onTriggered: {
-            root.hideDescription()
+            if (root.action !== RegionSelection.SnipAction.LongShot) root.hideDescription()
         }
     }
     onActionChanged: {
@@ -103,6 +107,8 @@ Item {
                 sourceComponent: StyledText {
                     color: Appearance.colors.colOnPrimary
                     text: root.description
+                    width: Math.min(implicitWidth, 420)
+                    elide: Text.ElideRight
                     anchors.right: parent.right
                     anchors.rightMargin: 6
                 }

@@ -559,6 +559,15 @@ Singleton {
 
             property JsonObject screenSnip: JsonObject {
                 property string savePath: "" // only copy to clipboard when empty
+                property JsonObject longShot: JsonObject {
+                    property int captureInterval: 120 // ms between samples while manually scrolling
+                    property int settleDelay: 300 // ms to wait after the selector closes
+                    property int maxShots: 80 // hard cap on captured frames
+                    property int minOverlap: 40 // min matching rows for a valid seam
+                    property int maxOverlap: 0 // 0 = auto (up to a full frame)
+                    property real stitchThreshold: 0.8 // min ZNCC for a seam to be accepted
+                    property int trimRight: 0 // ignore N right-hand px when matching (scrollbars)
+                }
             }
 
             property JsonObject sounds: JsonObject {
