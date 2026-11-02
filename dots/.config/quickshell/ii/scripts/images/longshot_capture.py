@@ -21,7 +21,7 @@ import time
 import numpy as np
 from PIL import Image
 
-from longshot_stitch import best_overlap, gray
+from longshot_stitch import ManualStitcher
 
 
 def emit(event, **fields):
@@ -32,38 +32,6 @@ def notify(title, body):
     if shutil.which("notify-send"):
         subprocess.Popen(["notify-send", "-a", "Long screenshot", title, body],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
-class ManualStitcher:
-    """Append matching new rows; pauses and backtracking add no frames."""
-
-    def __init__(self, first, min_overlap=40, max_overlap=0, threshold=0.8,
-                 trim_right=0):
-        self.image = first
-        self.last_gray = gray(first)
-        self.frames = 1
-        self.min_overlap = min_overlap
-        self.max_overlap = max_overlap
-        self.threshold = threshold
-        self.trim_right = trim_right
-
-    def add(self, frame):
-        if frame.shape != self.last_gray.shape + (3,):
-            raise ValueError("The capture region changed size")
-        next_gray = gray(frame)
-        if float(np.abs(self.last_gray - next_gray).mean()) < 0.5:
-            return "unchanged"
-        overlap, correlation = best_overlap(
-            self.last_gray, next_gray, min_overlap=self.min_overlap,
-            max_overlap=self.max_overlap, trim_right=self.trim_right)
-        if overlap >= frame.shape[0] - 1 and correlation >= self.threshold:
-            return "unchanged"
-        if overlap < self.min_overlap or correlation < self.threshold:
-            return "no-overlap"
-        self.image = np.vstack((self.image, frame[overlap:]))
-        self.last_gray = next_gray
-        self.frames += 1
-        return "added"
 
 
 def capture(region):
@@ -96,6 +64,9 @@ def parse_args(argv=None):
     parser.add_argument("--max-overlap", type=int, default=settings.get("maxOverlap", 0))
     parser.add_argument("--threshold", type=float, default=settings.get("stitchThreshold", 0.8))
     parser.add_argument("--trim-right", type=int, default=settings.get("trimRight", 0))
+    parser.add_argument("--max-pixels", type=int, default=settings.get("maxPixels", 64_000_000))
+    parser.add_argument("--no-auto-trim", action="store_true", default=not settings.get("autoTrim", True))
+    parser.add_argument("--preview-dir", type=Path)
     parser.add_argument("--output")
     parser.add_argument("--no-copy", action="store_true")
     parser.add_argument("--no-notify", action="store_true")
@@ -105,8 +76,12 @@ def parse_args(argv=None):
         parser.error("interval must be >= 30 ms, settle delay >= 0, max shots >= 2")
     if args.min_overlap < 4 or args.max_overlap < 0 or args.trim_right < 0:
         parser.error("invalid overlap or trim settings")
+    if args.max_overlap and args.max_overlap < args.min_overlap:
+        parser.error("max overlap must be zero or at least min overlap")
     if not 0 < args.threshold <= 1:
         parser.error("threshold must be in (0, 1]")
+    if args.max_pixels < 1:
+        parser.error("max pixels must be positive")
     args.save_path = config.get("savePath", "")
     return args
 
@@ -119,17 +94,20 @@ def run(args):
     if not re.fullmatch(r"(-?\d+),(-?\d+) ([1-9]\d*)x([1-9]\d*)", args.region):
         raise ValueError("Invalid capture region; expected X,Y WxH")
     command = None
+    paused = False
+    paused_at_finish = False
 
     def handle_signal(signum, _frame):
-        nonlocal command
+        nonlocal command, paused_at_finish
         command = "finish" if signum == signal.SIGINT else "cancel"
+        paused_at_finish = paused
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
     control_buffer = b""
 
     def wait_control(seconds):
-        nonlocal command, control_buffer
+        nonlocal command, control_buffer, paused, paused_at_finish
         if command:
             return
         if not args.control_stdin:
@@ -144,32 +122,73 @@ def run(args):
             control_buffer += chunk
             while b"\n" in control_buffer:
                 line, control_buffer = control_buffer.split(b"\n", 1)
-                if line.strip() in (b"finish", b"cancel"):
-                    command = line.strip().decode()
+                action = line.strip().decode("ascii", errors="ignore")
+                if action == "cancel":
+                    command = action
+                elif not command:
+                    if action == "finish":
+                        paused_at_finish = paused
+                        command = action
+                    elif action in {"pause", "resume"}:
+                        paused = action == "pause"
 
     wait_control(args.settle_delay / 1000)
-    if command == "cancel":
+    if command:
         emit("cancelled")
         return 0
     stitcher = ManualStitcher(capture(args.region), args.min_overlap,
-                             args.max_overlap, args.threshold, args.trim_right)
-    warning = False
+                             args.max_overlap, args.threshold, args.trim_right,
+                             args.max_pixels, not args.no_auto_trim)
+    status = "waiting"
+    preview_revision = 0
+    preview_path = ""
+    limit_reached = False
+    if args.preview_dir:
+        args.preview_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
-    def progress():
-        emit("progress", frames=stitcher.frames, height=stitcher.image.shape[0],
-             warning=warning)
+    def progress(update_preview=False):
+        nonlocal preview_revision, preview_path
+        if update_preview and args.preview_dir:
+            # Alternating paths invalidate QML's cache without accumulating files.
+            path = args.preview_dir / f"preview-{preview_revision % 2}.png"
+            temporary = path.with_suffix(".tmp")
+            stitcher.preview().save(temporary, format="PNG")
+            temporary.replace(path)
+            preview_path = str(path)
+            preview_revision += 1
+        emit("progress", frames=stitcher.frames, width=stitcher.width,
+             height=stitcher.height, frameHeight=stitcher.frame_height, status="paused" if paused else status,
+             confidence=round(stitcher.last_match.confidence, 3),
+             fixedTop=stitcher.last_match.fixed_top,
+             fixedBottom=stitcher.last_match.fixed_bottom,
+             warning=status in {"no-overlap", "ambiguous", "backtracking"},
+             preview=preview_path, revision=preview_revision)
 
-    progress()
+    progress(True)
+    next_capture = time.monotonic() + args.interval / 1000
+    reported_paused = False
     while command != "cancel" and stitcher.frames < args.max_shots:
-        wait_control(0 if command == "finish" else args.interval / 1000)
+        wait_control(max(0, next_capture - time.monotonic()) if not paused else 0.25)
         if command == "cancel":
             break
-        # Capture again on finish to include the user's last scroll.
-        result = stitcher.add(capture(args.region))
-        next_warning = result == "no-overlap"
-        if result == "added" or next_warning != warning:
-            warning = next_warning
+        if paused != reported_paused:
+            reported_paused = paused
             progress()
+        if paused and command != "finish":
+            continue
+        # Finishing while paused saves only content the user already accepted.
+        if command == "finish" and paused_at_finish:
+            break
+        started = time.monotonic()
+        result = stitcher.add(capture(args.region))
+        next_capture = started + args.interval / 1000
+        if result == "limit":
+            limit_reached = True
+            break
+        next_status = "capturing" if result in {"added", "unchanged"} else result
+        if result == "added" or next_status != status:
+            status = next_status
+            progress(result == "added")
         if command == "finish":
             break
 
@@ -183,7 +202,12 @@ def run(args):
     output = Path(args.output).expanduser() if args.output else directory / (
         f"longshot-{time.strftime('%Y-%m-%d_%H.%M.%S')}-{time.time_ns() % 1000000000:09d}.png")
     output.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(stitcher.image).save(output, format="PNG")
+    temporary = output.with_name(output.name + ".part")
+    try:
+        Image.fromarray(stitcher.image).save(temporary, format="PNG")
+        temporary.replace(output)
+    finally:
+        temporary.unlink(missing_ok=True)
     copy_failed = False
     if not args.no_copy:
         try:
@@ -193,13 +217,16 @@ def run(args):
         except (OSError, subprocess.SubprocessError):
             copy_failed = True
     emit("done", output=str(output), frames=stitcher.frames,
-         height=stitcher.image.shape[0], copied=not args.no_copy and not copy_failed)
+         height=stitcher.height, width=stitcher.width,
+         copied=not args.no_copy and not copy_failed,
+         truncated=status in {"no-overlap", "ambiguous", "backtracking"},
+         limited=limit_reached or stitcher.frames >= args.max_shots)
     if not args.no_notify:
-        details = f"{stitcher.frames} frames · {stitcher.image.shape[0]} px\nSaved: {output}"
-        if warning:
+        details = f"{stitcher.frames} frames · {stitcher.height} px\nSaved: {output}"
+        if status in {"no-overlap", "ambiguous", "backtracking"}:
             details += "\nLast view did not overlap; saved through the last matching frame."
-        if stitcher.frames >= args.max_shots:
-            details += "\nFrame limit reached."
+        if limit_reached or stitcher.frames >= args.max_shots:
+            details += "\nCapture size limit reached; saved through the last accepted frame."
         if copy_failed:
             details += "\nClipboard copy failed."
         notify("Long screenshot ready", details)

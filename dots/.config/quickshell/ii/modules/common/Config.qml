@@ -565,8 +565,10 @@ Singleton {
                     property int maxShots: 80 // hard cap on captured frames
                     property int minOverlap: 40 // min matching rows for a valid seam
                     property int maxOverlap: 0 // 0 = auto (up to a full frame)
-                    property real stitchThreshold: 0.8 // min ZNCC for a seam to be accepted
-                    property int trimRight: 0 // ignore N right-hand px when matching (scrollbars)
+                    property real stitchThreshold: 0.8 // minimum verified alignment score
+                    property int trimRight: 0 // 0 = automatically ignore the scrollbar edge
+                    property bool autoTrim: true // detect fixed headers/footers during matching
+                    property int maxPixels: 64000000 // save the last safe image at this limit
                 }
             }
 

@@ -193,6 +193,11 @@ PanelWindow {
         screenshotDir: root.screenshotDir
         screenshotPath: root.screenshotPath
         onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0) {
+                console.warn("[Region Selector] Could not capture the selected screen.");
+                root.dismiss();
+                return;
+            }
             if (root.enableContentRegions) imageDetectionProcess.running = true;
             root.preparationDone = !checkRecordingProc.running;
         }
@@ -229,10 +234,14 @@ PanelWindow {
         stdout: StdioCollector {
             id: imageDimensionCollector
             onStreamFinished: {
-                imageRegions = RegionFunctions.filterImageRegions(
-                    JSON.parse(imageDimensionCollector.text),
-                    root.windowRegions
-                );
+                try {
+                    const regions = JSON.parse(imageDimensionCollector.text.trim() || "[]");
+                    root.imageRegions = Array.isArray(regions)
+                        ? RegionFunctions.filterImageRegions(regions, root.windowRegions) : [];
+                } catch (error) {
+                    root.imageRegions = [];
+                    console.warn("[Region Selector] Content detection unavailable:", error);
+                }
             }
         }
     }
@@ -319,10 +328,11 @@ PanelWindow {
         }
     }
 
-    ScreencopyView { // For freezing
+    Image { // Reuse the frozen capture already produced by screenshotProc.
         anchors.fill: parent
-        live: false
-        captureSource: root.screen
+        source: root.preparationDone ? "file://" + root.screenshotPath : ""
+        cache: false
+        fillMode: Image.Stretch
         visible: root.phase === RegionSelection.Phase.Select
 
         focus: root.visible

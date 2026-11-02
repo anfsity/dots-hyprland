@@ -38,6 +38,7 @@ Scope {
             longshotSession.finish();
             return;
         }
+        longshotSession.dismissResult();
         root.action = RegionSelection.SnipAction.Copy
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
         GlobalStates.regionSelectorOpen = true
@@ -84,9 +85,15 @@ Scope {
             longshotSession.finish();
             return;
         }
+        longshotSession.dismissResult();
         root.action = RegionSelection.SnipAction.LongShot
         root.selectionMode = RegionSelection.SelectionMode.RectCorners
         GlobalStates.regionSelectorOpen = true
+    }
+
+    function cancelLongshot() {
+        longshotSession.cancel();
+        root.dismiss();
     }
 
     LongShotSession {
@@ -114,11 +121,14 @@ Scope {
         function longshot() {
             root.longshot()
         }
+        function pauseLongshot() {
+            longshotSession.togglePause()
+        }
         function finishLongshot() {
             longshotSession.finish()
         }
         function cancelLongshot() {
-            longshotSession.cancel()
+            root.cancelLongshot()
         }
     }
 
@@ -131,6 +141,16 @@ Scope {
         name: "regionLongShot"
         description: "Takes a long screenshot of the selected region"
         onPressed: root.longshot()
+    }
+    GlobalShortcut {
+        name: "regionLongShotPause"
+        description: "Pauses or resumes the long screenshot"
+        onPressed: longshotSession.togglePause()
+    }
+    GlobalShortcut {
+        name: "regionLongShotCancel"
+        description: "Cancels the long screenshot"
+        onPressed: root.cancelLongshot()
     }
     GlobalShortcut {
         name: "regionSearch"

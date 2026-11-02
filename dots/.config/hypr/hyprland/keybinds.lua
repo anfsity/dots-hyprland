@@ -96,6 +96,10 @@ hl.bind("SUPER + SHIFT + ALT + S", hl.dsp.global("quickshell:regionLongShot"),
     { description = "Utilities: Long screenshot" })
 hl.bind("SUPER + SHIFT + ALT + S",
     hl.dsp.exec_cmd(qsIsAlive .. " || " .. qsScripts .. "/images/longshot.sh"))
+hl.bind("SUPER + SHIFT + ALT + P", hl.dsp.global("quickshell:regionLongShotPause"),
+    { description = "Utilities: Pause or resume long screenshot" })
+hl.bind("SUPER + SHIFT + ALT + Escape", hl.dsp.global("quickshell:regionLongShotCancel"),
+    { description = "Utilities: Cancel long screenshot" })
 --# Fullscreen screenshot
 local grimhyprctl = "grim -o \"$(hyprctl activeworkspace -j | jq -r '.monitor')\""
 hl.bind("Print", hl.dsp.exec_cmd(grimhyprctl .. " - | wl-copy"),
