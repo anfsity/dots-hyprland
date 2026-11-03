@@ -62,6 +62,26 @@
 
 </details>
 
+## Local configuration layout (anfsity)
+
+- `~/Beautify/dots-hyprland` is the maintained source checkout (`my-config`).
+- `~/.config/hypr` is an independent directory containing the installed Hyprland
+  configuration. It no longer links to `~/dotfile/hypr/.config/hypr`.
+- `~/.config/kitty` is also an independent directory. Its configuration in
+  `dots/.config/kitty` matches the local font, appearance, and key bindings.
+- `~/.config/quickshell/ii` contains the installed Quickshell code; user settings
+  are stored separately in `~/.config/illogical-impulse/config.json`.
+- `~/dotfile` remains a separate repository. Its Hyprland and Kitty files are
+  retained as the previous copies; these two runtime directories no longer use
+  it. Other personal dotfiles remain managed there.
+
+Source edits need to be copied or installed into the runtime directories to take
+effect. Runtime edits do not automatically update this checkout. The installer
+syncs the default Hyprland configuration and preserves existing files in
+`~/.config/hypr/custom`; it also syncs the Quickshell directory, deleting files
+that are absent from the source. Keep machine-specific overrides in `custom/`
+and review local additions before a full reinstall.
+
 ## Optional Skwd Wall picker
 
 In **Settings → Interface → Wallpaper selector**, choose **Built-in selector** or **Skwd Wall**.
