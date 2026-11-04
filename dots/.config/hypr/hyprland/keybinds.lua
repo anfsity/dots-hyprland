@@ -10,6 +10,7 @@ local qsIpcCall = "qs -c $qsConfig ipc call"
 local qsIsAlive = qsIpcCall .. " TEST_ALIVE"
 
 require("hyprland.lib.super_key")()
+require("hyprland.lib.longshot_input")()
 
 hl.bind("SUPER + SUPER_L", hl.dsp.global("quickshell:searchToggleRelease"), { description = "Shell: Toggle search" })
 hl.bind("SUPER + SUPER_R", hl.dsp.global("quickshell:searchToggleRelease"))
@@ -100,6 +101,8 @@ hl.bind("SUPER + SHIFT + ALT + S",
     hl.dsp.exec_cmd(qsIsAlive .. " || " .. qsScripts .. "/images/longshot.sh"))
 hl.bind("SUPER + SHIFT + ALT + P", hl.dsp.global("quickshell:regionLongShotPause"),
     { description = "Utilities: Pause or resume long screenshot" })
+hl.bind("SUPER + SHIFT + ALT + A", hl.dsp.global("quickshell:regionLongShotAuto"),
+    { description = "Utilities: Toggle automatic long screenshot scrolling" })
 hl.bind("SUPER + SHIFT + ALT + Escape", hl.dsp.global("quickshell:regionLongShotCancel"),
     { description = "Utilities: Cancel long screenshot" })
 --# Fullscreen screenshot

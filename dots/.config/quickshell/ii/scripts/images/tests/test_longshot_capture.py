@@ -182,11 +182,12 @@ sys.stdout.buffer.write((d / f"{min(i, 2)}.png").read_bytes())
                     stream.close()
         self.temp.cleanup()
 
-    def start(self, *extra):
+    def start(self, *extra, script=None):
         environment = dict(os.environ, PATH=f"{self.directory}:{os.environ['PATH']}",
-                           XDG_CONFIG_HOME=str(self.directory), LONGSHOT_TEST_DIR=str(self.directory))
+                           XDG_CONFIG_HOME=str(self.directory), LONGSHOT_TEST_DIR=str(self.directory),
+                           HYPRLAND_INSTANCE_SIGNATURE="")
         self.process = subprocess.Popen([
-            sys.executable, "-u", str(SCRIPTS / "longshot_capture.py"),
+            sys.executable, "-u", str(script or SCRIPTS / "longshot_capture.py"),
             "--region", "-200,100 96x240", "--control-stdin", "--interval", "30",
             "--settle-delay", "0", "--no-copy", "--no-notify",
             "--output", str(self.directory / "result.png"), *extra,

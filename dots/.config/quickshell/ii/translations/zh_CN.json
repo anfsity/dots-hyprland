@@ -750,5 +750,17 @@
   "Saved and copied to clipboard.": "已保存并复制到剪贴板。",
   "Saved. Clipboard copy was unavailable.": "已保存图片，但未能复制到剪贴板。",
   "Capture ended unexpectedly. Try selecting the region again.": "采集意外结束，请重新选择区域。",
-  "No overlapping scroll captured; select scrolling content and scroll down slowly": "尚未采集到可拼接的滚动内容，请选择内容区域后缓慢向下滚动。"
+  "No overlapping scroll captured; select scrolling content and scroll down slowly": "尚未采集到可拼接的滚动内容，请选择内容区域后缓慢向下滚动。",
+  "Auto scrolling": "自动滚动中",
+  "Auto-scroll is on. Move the pointer or scroll manually to pause.": "正在自动滚动，移动鼠标或手动滚轮可暂停。",
+  "Auto scroll": "自动滚动",
+  "Use manual scrolling": "切换为手动滚动",
+  "The capture window changed. Resume in the original window or use manual scrolling.": "采集窗口已变化。请回到原窗口继续，或切换为手动滚动。",
+  "Pointer moved. Resume auto-scroll or continue manually.": "鼠标已移动，自动滚动已暂停。可继续自动滚动或切换为手动。",
+  "Auto-scroll is unavailable. Continue with manual scrolling.": "自动滚动暂不可用，请继续手动滚动。",
+  "Manual input detected. Resume auto-scroll or continue manually.": "检测到手动操作，自动滚动已暂停。可继续自动滚动或切换为手动。",
+  "Move the pointer into the selected content to start auto-scroll.": "将鼠标移入选中的内容区域并停留，即可开始自动滚动。",
+  "The page is still moving. Auto-scroll paused; resume when it settles.": "页面仍在变化，自动滚动已暂停。请等待画面稳定后继续。",
+  "Alignment lost. Adjust the scroll position manually, then resume auto-scroll.": "内容未能对齐。请手动调整滚动位置，再继续自动滚动。",
+  "No scrolling detected. Try manual scrolling or select a different region.": "未检测到内容滚动。请尝试手动滚动，或重新选择区域。"
 }

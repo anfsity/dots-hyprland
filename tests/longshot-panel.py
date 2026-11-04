@@ -65,6 +65,13 @@ def main():
             draw.text((12, y), f'{index + 1:02d}  Reading notes', fill='#26324d')
             draw.rounded_rectangle((12, y + 19, 175, y + 22), radius=1, fill='#bcc7db')
         preview.save(root / 'preview.png')
+        wide_preview = Image.new('RGB', (2441, 713), '#f7f8fc')
+        wide_draw = ImageDraw.Draw(wide_preview)
+        wide_draw.rectangle((0, 0, 2441, 110), fill='#253451')
+        for index in range(8):
+            y = 150 + index * 62
+            wide_draw.rounded_rectangle((60, y, 1800 - index * 70, y + 12), radius=6, fill='#9aa9c4')
+        wide_preview.save(root / 'preview-wide.png')
         text = r'''import QtQuick
 import QtTest
 
@@ -82,6 +89,7 @@ TestCase {
     SignalSpy { id: pauseSpy; signalName: "pauseRequested" }
     SignalSpy { id: finishSpy; signalName: "finishRequested" }
     SignalSpy { id: openSpy; signalName: "openRequested" }
+    SignalSpy { id: autoSpy; signalName: "autoRequested" }
     function init() {
         failOnWarning(/.*/);
         panel = createTemporaryObject(factory, testCase, {
@@ -93,11 +101,12 @@ TestCase {
         pauseSpy.target = panel; pauseSpy.clear();
         finishSpy.target = panel; finishSpy.clear();
         openSpy.target = panel; openSpy.clear();
+        autoSpy.target = panel; autoSpy.clear();
         tryCompare(findChild(panel, "previewImage"), "status", Image.Ready);
         wait(50);
     }
     function cleanup() {
-        pauseSpy.target = null; finishSpy.target = null; openSpy.target = null;
+        pauseSpy.target = null; finishSpy.target = null; openSpy.target = null; autoSpy.target = null;
     }
     function test_capture_controls() {
         const pauseButton = findChild(panel, "pauseButton");
@@ -116,6 +125,33 @@ TestCase {
         flick.contentY = 0;
         compare(flick.contentY, 0);
     }
+    function test_auto_toggle_controls_and_guidance() {
+        const automatic = findChild(panel, "autoButton");
+        verify(automatic.visible && automatic.enabled);
+        mouseClick(automatic);
+        compare(autoSpy.count, 1);
+        panel.automatic = true;
+        compare(automatic.selected, true);
+        verify(findChild(panel, "guidance").text.includes("pause"));
+        panel.phase = "paused";
+        verify(automatic.enabled);
+        panel.phase = "saving";
+        verify(!automatic.enabled);
+        panel.phase = "capturing";
+        panel.autoAvailable = false;
+        verify(!automatic.enabled);
+        panel.phase = "done";
+        verify(!automatic.visible);
+    }
+    function test_pause_press_keeps_its_intent_if_manual_input_pauses_first() {
+        panel.automatic = true;
+        const pause = findChild(panel, "pauseButton");
+        mousePress(pause);
+        panel.phase = "paused";
+        mouseRelease(pause);
+        compare(pauseSpy.count, 1);
+        compare(pauseSpy.signalArguments[0][0], false);
+    }
     function test_done_and_error_actions() {
         panel.phase = "done";
         tryCompare(findChild(panel, "finishButton"), "visible", false);
@@ -132,6 +168,38 @@ TestCase {
         compare(findChild(panel, "previewPane").visible, false);
         tryVerify(() => panel.height <= 210);
         verify(findChild(panel, "finishButton").visible);
+    }
+    function test_short_frame_opaque_surface_data() {
+        return [
+            {tag: "dark", surface: "#20211f26", preview: "#2017131d", text: "#e7e0ec", muted: "#cac4d0", accent: "#d0bcff", onAccent: "#381e72", warning: "#ffb4ab"},
+            {tag: "light", surface: "#20f3edf7", preview: "#20ffffff", text: "#211f26", muted: "#49454f", accent: "#6750a4", onAccent: "#ffffff", warning: "#b3261e"}
+        ];
+    }
+    function test_short_frame_opaque_surface(data) {
+        panel.surfaceColor = data.surface;
+        panel.surfaceVariant = data.preview;
+        panel.textColor = data.text;
+        panel.mutedColor = data.muted;
+        panel.accentColor = data.accent;
+        panel.accentTextColor = data.onAccent;
+        panel.warningColor = data.warning;
+        panel.phase = "error";
+        panel.frames = 1;
+        panel.imageWidth = 2441;
+        panel.imageHeight = 713;
+        panel.previewSource = WIDE_PREVIEW_URL;
+        panel.detail = "No overlapping scroll captured; select scrolling content and scroll down slowly";
+        tryCompare(findChild(panel, "previewImage"), "status", Image.Ready);
+        wait(250);
+        const preview = findChild(panel, "previewPane");
+        verify(preview.height <= 130, "Short frames should not leave a tall empty preview");
+        compare(panel.color.a, 1);
+        compare(preview.color.a, 1);
+        const rendered = grabImage(panel);
+        compare(rendered.alpha(panel.width / 2, panel.height - 8), 255);
+        compare(rendered.pixel(panel.width / 2, panel.height - 8), Qt.alpha(data.surface, 1));
+        verify(!findChild(panel, "guidance").truncated);
+        rendered.save(ARTIFACT_DIRECTORY + "/longshot-error-" + data.tag + ".png");
     }
     function test_selector_mode_changes_do_not_form_a_binding_loop() {
         const toolbar = createTemporaryObject(toolbarFactory, testCase, {
@@ -165,12 +233,19 @@ TestCase {
         let saved = false;
         verify(panel.grabToImage(result => { saved = result.saveToFile(RENDER_PATH); }));
         tryVerify(() => saved);
+        panel.automatic = true;
+        wait(100);
+        grabImage(panel).save(ARTIFACT_DIRECTORY + "/longshot-auto.png");
     }
 }'''
         translations = {'Long screenshot': '长截图', 'Capturing': '采集中', 'Pause': '暂停',
-                        'Finish': '完成', '%1 frames': '%1 帧',
+                        'Finish': '完成', '%1 frames': '%1 帧', 'Auto': '自动',
+                        'Auto scrolling': '自动滚动中',
+                        'Auto-scroll is on. Move the pointer or scroll manually to pause.': '正在自动滚动，移动鼠标或手动滚轮可暂停。',
                         'Scroll slowly. Press Super+Shift+S to finish.': '缓慢向下滚动，按 Super+Shift+S 完成。'}
+        text = text.replace('WIDE_PREVIEW_URL', json.dumps((root / 'preview-wide.png').as_uri()))
         text = text.replace('PREVIEW_URL', json.dumps((root / 'preview.png').as_uri()))
+        text = text.replace('ARTIFACT_DIRECTORY', json.dumps(str(artifacts)))
         text = text.replace('TRANSLATIONS', '(' + json.dumps(translations, ensure_ascii=False) + ')')
         text = text.replace('RENDER_PATH', json.dumps(str(artifacts / 'longshot-panel.png')))
         (root / 'tst_panel.qml').write_text(text)

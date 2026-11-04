@@ -24,6 +24,8 @@ Scope {
     property string output: ""
     property string detail: ""
     property bool cancelled: false
+    property bool automatic: false
+    property bool autoAvailable: true
 
     function start(region, targetScreen, bounds) {
         if (root.active) return;
@@ -40,6 +42,8 @@ Scope {
         root.output = "";
         root.detail = "";
         root.cancelled = false;
+        root.automatic = false;
+        root.autoAvailable = true;
         root.captureStatus = "waiting";
         root.phase = "starting";
         startDelay.start();
@@ -53,8 +57,22 @@ Scope {
     }
 
     function togglePause() {
+        setPaused(root.phase !== "paused");
+    }
+
+    function setPaused(paused) {
         if (!captureProc.running || !["capturing", "paused"].includes(root.phase)) return;
-        captureProc.write(root.phase === "paused" ? "resume\n" : "pause\n");
+        captureProc.write(paused ? "pause\n" : "resume\n");
+    }
+
+    function toggleAutomatic() {
+        if (!captureProc.running || !root.autoAvailable || !["capturing", "paused"].includes(root.phase)) return;
+        captureProc.write(root.automatic ? "manual\n" : "auto\n");
+    }
+
+    function interruptAutomatic() {
+        if (captureProc.running && root.automatic && root.phase === "capturing")
+            captureProc.write("interrupt\n");
     }
 
     function cancel() {
@@ -77,6 +95,9 @@ Scope {
             root.frameHeight = update.frameHeight;
             root.quality = update.confidence;
             root.captureStatus = update.status;
+            root.automatic = update.automatic ?? false;
+            root.autoAvailable = update.autoAvailable ?? true;
+            root.detail = update.message ? Translation.tr(update.message) : "";
             if (root.phase !== "saving" && !root.cancelled)
                 root.phase = update.status === "paused" ? "paused" : "capturing";
             if (update.preview && update.revision !== root.previewRevision) {
@@ -175,6 +196,8 @@ Scope {
             height: implicitHeight
             compact: !controlsWindow.complete && controlsWindow.fullPosition === null
             phase: root.phase
+            automatic: root.automatic
+            autoAvailable: root.autoAvailable
             captureStatus: root.captureStatus
             frames: root.frames
             imageWidth: root.imageWidth
@@ -184,17 +207,19 @@ Scope {
             previewSource: root.previewSource
             detail: root.detail
             tr: text => Translation.tr(text)
-            surfaceColor: Appearance.colors.colSurfaceContainer
-            surfaceVariant: Appearance.colors.colLayer0
-            textColor: Appearance.colors.colOnSurface
-            mutedColor: Appearance.colors.colSubtext
+            // This is a standalone surface, not an overlay on another themed layer.
+            surfaceColor: Appearance.m3colors.m3surfaceContainer
+            surfaceVariant: Appearance.m3colors.m3surfaceContainerLowest
+            textColor: Appearance.m3colors.m3onSurface
+            mutedColor: Appearance.m3colors.m3onSurfaceVariant
             accentColor: Appearance.colors.colPrimary
             accentTextColor: Appearance.colors.colOnPrimary
             warningColor: Appearance.colors.colError
             fontFamily: Appearance.font.family.main
             iconFamily: Appearance.font.family.iconMaterial
             onFinishRequested: root.finish()
-            onPauseRequested: root.togglePause()
+            onPauseRequested: resume => root.setPaused(!resume)
+            onAutoRequested: root.toggleAutomatic()
             onCancelRequested: root.cancel()
             onCloseRequested: root.phase = "idle"
             onOpenRequested: if (root.output) Quickshell.execDetached(["xdg-open", root.output])

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Manual scrolling screenshot. Ctrl+C finishes a standalone session.
-# Quickshell controls the session with finish/cancel commands on stdin.
+# Scrolling screenshot; manual by default, --auto-scroll opts in.
+# Quickshell controls capture and scrolling modes through stdin.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"

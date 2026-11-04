@@ -562,6 +562,7 @@ Singleton {
                 property JsonObject longShot: JsonObject {
                     property int captureInterval: 120 // ms between samples while manually scrolling
                     property int settleDelay: 300 // ms to wait after the selector closes
+                    property int autoSettleMs: 350 // minimum wait after an automatic scroll
                     property int maxShots: 80 // hard cap on captured frames
                     property int minOverlap: 40 // min matching rows for a valid seam
                     property int maxOverlap: 0 // 0 = auto (up to a full frame)

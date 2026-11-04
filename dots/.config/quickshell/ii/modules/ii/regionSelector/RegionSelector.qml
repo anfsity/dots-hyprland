@@ -124,6 +124,9 @@ Scope {
         function pauseLongshot() {
             longshotSession.togglePause()
         }
+        function autoLongshot() {
+            longshotSession.toggleAutomatic()
+        }
         function finishLongshot() {
             longshotSession.finish()
         }
@@ -151,6 +154,16 @@ Scope {
         name: "regionLongShotCancel"
         description: "Cancels the long screenshot"
         onPressed: root.cancelLongshot()
+    }
+    GlobalShortcut {
+        name: "regionLongShotAuto"
+        description: "Switches between manual and automatic long screenshot scrolling"
+        onPressed: longshotSession.toggleAutomatic()
+    }
+    GlobalShortcut {
+        name: "regionLongShotInterrupt"
+        description: "Pauses automatic scrolling when the user takes control"
+        onPressed: longshotSession.interruptAutomatic()
     }
     GlobalShortcut {
         name: "regionSearch"

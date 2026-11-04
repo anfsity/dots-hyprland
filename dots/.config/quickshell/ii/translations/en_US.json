@@ -634,5 +634,17 @@
   "Saved and copied to clipboard.": "Saved and copied to clipboard.",
   "Saved. Clipboard copy was unavailable.": "Saved. Clipboard copy was unavailable.",
   "Capture ended unexpectedly. Try selecting the region again.": "Capture ended unexpectedly. Try selecting the region again.",
-  "No overlapping scroll captured; select scrolling content and scroll down slowly": "No overlapping scroll captured; select scrolling content and scroll down slowly"
+  "No overlapping scroll captured; select scrolling content and scroll down slowly": "No overlapping scroll captured; select scrolling content and scroll down slowly",
+  "Auto scrolling": "Auto scrolling",
+  "Auto-scroll is on. Move the pointer or scroll manually to pause.": "Auto-scroll is on. Move the pointer or scroll manually to pause.",
+  "Auto scroll": "Auto scroll",
+  "Use manual scrolling": "Use manual scrolling",
+  "The capture window changed. Resume in the original window or use manual scrolling.": "The capture window changed. Resume in the original window or use manual scrolling.",
+  "Pointer moved. Resume auto-scroll or continue manually.": "Pointer moved. Resume auto-scroll or continue manually.",
+  "Auto-scroll is unavailable. Continue with manual scrolling.": "Auto-scroll is unavailable. Continue with manual scrolling.",
+  "Manual input detected. Resume auto-scroll or continue manually.": "Manual input detected. Resume auto-scroll or continue manually.",
+  "Move the pointer into the selected content to start auto-scroll.": "Move the pointer into the selected content to start auto-scroll.",
+  "The page is still moving. Auto-scroll paused; resume when it settles.": "The page is still moving. Auto-scroll paused; resume when it settles.",
+  "Alignment lost. Adjust the scroll position manually, then resume auto-scroll.": "Alignment lost. Adjust the scroll position manually, then resume auto-scroll.",
+  "No scrolling detected. Try manual scrolling or select a different region.": "No scrolling detected. Try manual scrolling or select a different region."
 }
