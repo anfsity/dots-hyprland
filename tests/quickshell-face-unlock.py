@@ -3,8 +3,10 @@
 
 Requires Qt 6 qmltestrunner. An optional argument selects a LockContext.qml file.
 Set QMLTESTRUNNER to override the runner executable.
+Set FACE_UNLOCK_ARTIFACTS to retain rendered status cards for visual inspection.
 """
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -15,12 +17,40 @@ import tempfile
 FIXTURES = {
     'imports/qs/qmldir': """module qs
 singleton GlobalStates 1.0 GlobalStates.qml
+singleton Translation 1.0 Translation.qml
 """,
     'imports/qs/GlobalStates.qml': """pragma Singleton
 import QtQml
 QtObject { property bool screenUnlockFailed: false; property bool screenLockContainsCharacters: false }""",
+    'imports/qs/Translation.qml': """pragma Singleton
+import QtQml
+QtObject { property var messages: ({}); function tr(text) { return messages[text] ?? text; } }""",
     'imports/qs/modules/common/qmldir': """module qs.modules.common
 singleton Config 1.0 Config.qml
+singleton Appearance 1.0 Appearance.qml
+""",
+    'imports/qs/modules/common/Appearance.qml': """pragma Singleton
+import QtQml
+QtObject {
+ property var m3colors: ({m3surfaceContainer: "#211a2d"})
+ property var colors: ({colPrimary: "#cdb7ff", colOnSurface: "#e7deff", colOnSurfaceVariant: "#cac2d5"})
+ property var font: ({pixelSize: {small: 14, smaller: 12}})
+}
+""",
+    'imports/qs/modules/common/widgets/qmldir': """module qs.modules.common.widgets
+StyledText 1.0 StyledText.qml
+MaterialSymbol 1.0 MaterialSymbol.qml
+ToolbarButton 1.0 ToolbarButton.qml
+""",
+    'imports/qs/modules/common/widgets/StyledText.qml': """import QtQuick
+Text { }
+""",
+    'imports/qs/modules/common/widgets/MaterialSymbol.qml': """import QtQuick
+Text { property real iconSize: 24; font.family: "Material Symbols Rounded"; font.pixelSize: iconSize }
+""",
+    'imports/qs/modules/common/widgets/ToolbarButton.qml': """import QtQuick
+import QtQuick.Controls
+Button { background: Rectangle { color: \"transparent\"; radius: 18 } }
 """,
     'imports/qs/modules/common/Config.qml': """pragma Singleton
 import QtQml
@@ -104,6 +134,41 @@ TestCase {
      context.sessionLocked = true;
      tryCompare(face, "active", true);
  }
+ function test_visible_scan_states() {
+     compare(context.faceAuthState, "idle");
+     context.sessionLocked = true;
+     compare(context.faceAuthState, "waiting");
+     tryCompare(context, "faceAuthState", "scanning");
+     face.finish(PamResult.Failed);
+     compare(context.faceAuthState, "retrying");
+     tryCompare(context, "faceAuthState", "scanning");
+     face.finish(PamResult.Error);
+     compare(context.faceAuthState, "unavailable");
+ }
+ function test_retry_skips_delay_without_duplicate_scan() {
+     Config.options = {lock: {faceUnlock: {enable: true, startDelayMs: 5000, retryDelayMs: 5000}}};
+     context.sessionLocked = true;
+     compare(context.faceAuthState, "waiting");
+     context.retryFaceUnlock();
+     tryCompare(face, "starts", 1);
+     context.retryFaceUnlock();
+     compare(face.starts, 1);
+     face.finish(PamResult.Failed);
+     compare(context.faceAuthState, "retrying");
+     context.retryFaceUnlock();
+     tryCompare(face, "starts", 2);
+ }
+ function test_retry_error_and_guard_power_action() {
+     beginScan();
+     face.finish(PamResult.Error);
+     compare(context.faceAuthState, "unavailable");
+     context.retryFaceUnlock();
+     tryCompare(face, "starts", 2);
+     context.targetAction = LockContext.ActionEnum.Poweroff;
+     context.retryFaceUnlock();
+     wait(30);
+     compare(face.starts, 2);
+ }
  function test_requires_secure_lock() {
      wait(30);
      compare(face.starts, 0);
@@ -165,6 +230,7 @@ TestCase {
      face.pamMessage();
      compare(face.active, false);
      compare(context.faceAuthInProgress, false);
+     compare(context.faceAuthState, "confirmation");
      face.finish(PamResult.Success);
      compare(unlocked.count, 0);
  }
@@ -186,6 +252,114 @@ TestCase {
  }
 }
 """,
+    'tst_face_ui.qml': """import QtQuick
+import QtTest
+import Quickshell.Services.Pam
+import qs
+import qs.modules.common
+
+TestCase {
+ id: testCase
+ name: "FaceUnlockUI"
+ when: windowShown
+ visible: true
+ width: 480
+ height: 400
+ property var context
+ property var card
+ Component { id: contextFactory; LockContext {} }
+ Component { id: cardFactory; FaceAuthStatus {} }
+ function init() {
+     failOnWarning(/.*/);
+     Config.options = {lock: {faceUnlock: {enable: true, startDelayMs: 5000, retryDelayMs: 5000}}};
+     context = createTemporaryObject(contextFactory, testCase);
+     context.gazeAvailable = true;
+     context.sessionLocked = true;
+     card = createTemporaryObject(cardFactory, testCase, {context: context, width: 440});
+     verify(card !== null);
+ }
+ function cleanup() {
+     context.sessionLocked = false;
+     card.destroy();
+     wait(0);
+ }
+ function test_visibility_and_power_action() {
+     verify(card.visible);
+     context.targetAction = LockContext.ActionEnum.Poweroff;
+     verify(!card.visible);
+     context.targetAction = LockContext.ActionEnum.Unlock;
+     verify(card.visible);
+     context.tryUnlock();
+     verify(!card.visible);
+ }
+ function test_hidden_when_disabled_or_unlocked() {
+     context.gazeAvailable = false;
+     verify(!card.visible);
+     context.gazeAvailable = true;
+     verify(card.visible);
+     context.sessionLocked = false;
+     verify(!card.visible);
+ }
+ function test_retry_button_starts_scan() {
+     const retry = findChild(card, "faceRetryButton");
+     verify(retry.visible);
+     mouseClick(retry);
+     tryCompare(context, "faceAuthState", "scanning");
+     verify(!retry.visible);
+     context.stopFacePam();
+     context.faceAuthState = "confirmation";
+     verify(!retry.visible);
+     verify(card.needsPassword);
+ }
+ function test_scan_animation_and_opaque_background() {
+     context.retryFaceUnlock();
+     tryCompare(context, "faceAuthState", "scanning");
+     const line = findChild(card, "faceScanLine");
+     verify(line.visible);
+     const initialY = line.y;
+     wait(120);
+     verify(line.y !== initialY);
+     compare(card.color.a, 1);
+     compare(grabImage(card).alpha(card.width / 2, card.height - 8), 255);
+     context.stopFacePam();
+     verify(!line.visible);
+ }
+ function test_render_status_cards() {
+     if (!ARTIFACT_DIRECTORY) return;
+     Translation.messages = TRANSLATIONS;
+     for (const state of ["waiting", "scanning", "retrying", "unavailable", "confirmation"]) {
+         context.faceAuthState = state;
+         context.faceAuthInProgress = state === "scanning";
+         wait(250);
+         grabImage(card).save(ARTIFACT_DIRECTORY + "/gaze-" + state + ".png");
+     }
+     Translation.messages = {};
+ }
+ function test_narrow_and_long_text_layout() {
+     card.width = 240;
+     const states = ["waiting", "scanning", "retrying", "unavailable", "confirmation"];
+     for (const state of states) {
+         context.faceAuthState = state;
+         context.faceAuthInProgress = state === "scanning";
+         wait(20);
+         verify(card.height > 40);
+         verify(card.height < 240);
+         function checkBounds(item) {
+             for (const child of item.children) {
+                 if (!child.visible || child.width <= 0) continue;
+                 const pos = child.mapToItem(card, 0, 0);
+                 verify(pos.x >= -1 && pos.x + child.width <= card.width + 1,
+                        state + ": horizontal overflow");
+                 verify(pos.y >= -1 && pos.y + child.height <= card.height + 1,
+                        state + ": vertical overflow");
+                 checkBounds(child);
+             }
+         }
+         checkBounds(card);
+     }
+ }
+}
+""",
 }
 
 
@@ -202,14 +376,24 @@ def main():
     if not runner:
         raise SystemExit("Install Qt 6 qmltestrunner or set QMLTESTRUNNER.")
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
-               QT_QPA_PLATFORMTHEME="", QT_IM_MODULE="")
+               QT_QUICK_CONTROLS_STYLE="Basic", QT_QPA_PLATFORMTHEME="", QT_IM_MODULE="")
+    artifacts = os.environ.get("FACE_UNLOCK_ARTIFACTS", "")
+    if artifacts:
+        artifacts = str(Path(artifacts).resolve())
+        Path(artifacts).mkdir(parents=True, exist_ok=True)
+    translations = json.loads((Path(__file__).resolve().parents[1] /
+                              "dots/.config/quickshell/ii/translations/zh_CN.json").read_text())
     with tempfile.TemporaryDirectory(prefix="quickshell-face-test-") as directory:
         root = Path(directory)
         for name, content in FIXTURES.items():
             target = root / name
             target.parent.mkdir(parents=True, exist_ok=True)
+            if name == 'tst_face_ui.qml':
+                content = content.replace('ARTIFACT_DIRECTORY', json.dumps(artifacts))
+                content = content.replace('TRANSLATIONS', '(' + json.dumps(translations, ensure_ascii=False) + ')')
             target.write_text(content)
         shutil.copy(source, root / "LockContext.qml")
+        shutil.copy(source.with_name("FaceAuthStatus.qml"), root / "FaceAuthStatus.qml")
         subprocess.run([runner, "-input", str(root), "-import", str(root / "imports")],
                        env=env, check=True, timeout=40)
 

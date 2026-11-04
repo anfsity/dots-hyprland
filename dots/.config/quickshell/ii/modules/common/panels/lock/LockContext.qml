@@ -23,6 +23,7 @@ Scope {
     property bool sessionLocked: false
     property bool gazeAvailable: false
     property bool faceAuthInProgress: false
+    property string faceAuthState: "idle"
     readonly property bool faceUnlockEnabled: gazeAvailable && (Config.options.lock.faceUnlock?.enable ?? true)
     property var targetAction: LockContext.ActionEnum.Unlock
     property bool alsoInhibitIdle: false
@@ -104,12 +105,21 @@ Scope {
                 || root.targetAction !== LockContext.ActionEnum.Unlock
                 || facePam.active || faceStartTimer.running) return;
         faceStartTimer.interval = Math.max(0, delay);
+        root.faceAuthState = "waiting";
         faceStartTimer.start();
+    }
+
+    function retryFaceUnlock() {
+        if (!root.sessionLocked || !root.faceUnlockEnabled || root.unlockInProgress
+                || root.targetAction !== LockContext.ActionEnum.Unlock || root.faceAuthInProgress) return;
+        stopFacePam();
+        tryFaceUnlock(0);
     }
 
     function stopFacePam() {
         faceStartTimer.stop();
         root.faceAuthInProgress = false;
+        root.faceAuthState = "idle";
         if (facePam.active) facePam.abort();
     }
 
@@ -119,6 +129,7 @@ Scope {
             if (root.sessionLocked && root.faceUnlockEnabled && !root.unlockInProgress
                     && root.targetAction === LockContext.ActionEnum.Unlock) {
                 root.faceAuthInProgress = facePam.start();
+                root.faceAuthState = root.faceAuthInProgress ? "scanning" : "unavailable";
             }
         }
     }
@@ -138,7 +149,10 @@ Scope {
         // Confirmation prompts need UI support; fall back to the password instead
         // of answering them automatically or forwarding the user's password.
         onPamMessage: {
-            if (this.responseRequired) root.stopFacePam();
+            if (this.responseRequired) {
+                root.stopFacePam();
+                root.faceAuthState = "confirmation";
+            }
         }
 
         onCompleted: result => {
@@ -152,6 +166,9 @@ Scope {
             } else if (result === PamResult.Failed) {
                 // A scan can time out long before the user returns to the computer.
                 root.tryFaceUnlock(Config.options.lock.faceUnlock?.retryDelayMs ?? 10000);
+                root.faceAuthState = "retrying";
+            } else {
+                root.faceAuthState = "unavailable";
             }
         }
     }

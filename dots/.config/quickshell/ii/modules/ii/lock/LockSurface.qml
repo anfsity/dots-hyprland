@@ -96,6 +96,18 @@ MouseArea {
     //     }
     // }
 
+    FaceAuthStatus {
+        context: root.context
+        width: Math.min(implicitWidth, Math.max(0, root.width - 32))
+        anchors {
+            horizontalCenter: parent.horizontalCenter
+            bottom: mainIsland.top
+            bottomMargin: 12
+        }
+        scale: root.toolbarScale
+        opacity: root.toolbarOpacity
+    }
+
     // Main toolbar: password box
     Toolbar {
         id: mainIsland

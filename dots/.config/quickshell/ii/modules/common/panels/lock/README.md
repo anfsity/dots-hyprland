@@ -5,6 +5,14 @@ fingerprint authentication keep their existing PAM conversations. Install Gaze,
 start `gazed`, enroll the current user, and verify the camera with `gaze auth`.
 The optional integration is enabled only when the `gaze` CLI is available.
 
+The ii lock screen shows a themed status card above the password field, including
+the initial delay, active scan, failed match with automatic retry, and unavailable
+authentication. The Retry button starts a new scan immediately, including during
+the automatic retry delay. Password entry stays available while scanning. The
+card is hidden when face unlock is disabled or a power action is selected.
+The card uses an opaque theme surface, a quiet status light and an animated scan
+line. Retry stays in the header so the status text can wrap on narrow screens.
+
 The face-only PAM stack lives in `pam/quickshell-face`; no change to the system
 `login` PAM service is needed. Only an explicit successful match unlocks. Missing
 enrollment, unavailable services, and failed scans cannot grant access.
@@ -45,6 +53,9 @@ From the repository root, run the isolated QML behavior checks with:
 ```sh
 python3 tests/quickshell-face-unlock.py
 ```
+
+Set `FACE_UNLOCK_ARTIFACTS=/tmp/face-unlock-preview` to retain PNG renders of the
+Chinese status cards for visual inspection.
 
 The checks require Qt 6 `qmltestrunner`. They replace PAM and process execution
 with test doubles; hardware verification still requires a real lock/unlock.
